@@ -115,3 +115,20 @@ func (h *Handler) CreateForum(w http.ResponseWriter, r *http.Request) {
 
 	utils.Response(w, http.StatusCreated, result)
 }
+
+func (h *Handler) GetForumDetails(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	nickname, ok := vars["slug"]
+	if !ok {
+		utils.Response(w, http.StatusNotFound, nil)
+		return
+	}
+
+	userOut, err := h.uc.GetForum(r.Context(), nickname)
+	if err != nil {
+		utils.Response(w, http.StatusNotFound, nickname)
+		return
+	}
+	utils.Response(w, http.StatusOK, userOut)
+	return
+}

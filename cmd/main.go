@@ -34,6 +34,7 @@ func main() {
 		forumSubrouter := apiSubrouter.PathPrefix("/forum").Subrouter()
 		{
 			forumSubrouter.HandleFunc("/create", forumHandler.CreateForum).Methods(http.MethodPost)
+			forumSubrouter.HandleFunc("/{slug}/details", forumHandler.GetForumDetails).Methods(http.MethodGet)
 		}
 	}
 

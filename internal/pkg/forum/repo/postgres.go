@@ -20,13 +20,13 @@ func NewForumRepo(connection *pgxpool.Pool) *ForumRepository {
 }
 
 const (
-	SelectUserByNickname = `SELECT email, fullname, nickname, about FROM "user" WHERE nickname=$1 LIMIT 1;`
-	GetUsersOnConflict   = `SELECT email, fullname, nickname, about FROM "user" WHERE email = $1 or nickname = $2`
-	CreateUser           = `INSERT INTO "user" (email, fullname, nickname, about) VALUES ($1, $2, $3, $4) RETURNING nickname;`
-	UpdateUser           = `UPDATE "user" SET fullname=$1, email=$2, about=$3 WHERE nickname = $4 RETURNING nickname, fullname, about, email;`
-	CheckIfUserExists    = `SELECT nickname FROM "user" WHERE nickname =  $1`
-	CreateForum          = `INSERT INTO "forum" (title, "user", slug) VALUES ($1, $2, $3) RETURNING slug;`
-	GetForumBySlug       = `SELECT title, "user", slug, posts, threads FROM "forum" WHERE slug = $1;`
+	GetUserByNickname  = `SELECT email, fullname, nickname, about FROM "user" WHERE nickname=$1 LIMIT 1;`
+	GetUsersOnConflict = `SELECT email, fullname, nickname, about FROM "user" WHERE email = $1 or nickname = $2`
+	CreateUser         = `INSERT INTO "user" (email, fullname, nickname, about) VALUES ($1, $2, $3, $4) RETURNING nickname;`
+	UpdateUser         = `UPDATE "user" SET fullname=$1, email=$2, about=$3 WHERE nickname = $4 RETURNING nickname, fullname, about, email;`
+	CheckIfUserExists  = `SELECT nickname FROM "user" WHERE nickname =  $1`
+	CreateForum        = `INSERT INTO "forum" (title, "user", slug) VALUES ($1, $2, $3) RETURNING slug;`
+	GetForumBySlug     = `SELECT title, "user", slug, posts, threads FROM "forum" WHERE slug = $1;`
 )
 
 const (
@@ -37,7 +37,7 @@ const (
 func (r *ForumRepository) GetUser(ctx context.Context, nickname string) (models.User, error) {
 	var resultUser models.User
 
-	row := r.conn.QueryRow(ctx, SelectUserByNickname, nickname)
+	row := r.conn.QueryRow(ctx, GetUserByNickname, nickname)
 
 	err := row.Scan(&resultUser.Email, &resultUser.Fullname, &resultUser.Nickname, &resultUser.About)
 	if err != nil {
@@ -130,12 +130,12 @@ func (r *ForumRepository) GetForumBySlug(ctx context.Context, slug string) (mode
 }
 
 func (r *ForumRepository) CreateForum(ctx context.Context, forum models.Forum) (models.Forum, error) {
-	_, err := r.checkIfUserExists(ctx, forum.User)
+	user, err := r.checkIfUserExists(ctx, forum.User)
 	if err != nil {
 		return models.Forum{}, models.ErrorNotFound
 	}
 
-	row := r.conn.QueryRow(ctx, CreateForum, forum.Title, forum.User, forum.Slug)
+	row := r.conn.QueryRow(ctx, CreateForum, forum.Title, user.Nickname, forum.Slug)
 	err = row.Scan(&forum.Slug)
 	if err != nil {
 		if pqError, ok := err.(*pgconn.PgError); ok {
@@ -147,6 +147,20 @@ func (r *ForumRepository) CreateForum(ctx context.Context, forum models.Forum) (
 		}
 	}
 
+	forum.User = user.Nickname
 	r.Status.ForumsCount++
 	return forum, nil
+}
+
+func (r *ForumRepository) GetForum(ctx context.Context, slug string) (models.Forum, error) {
+	var resultForum models.Forum
+
+	row := r.conn.QueryRow(ctx, GetForumBySlug, slug)
+
+	err := row.Scan(&resultForum.Title, &resultForum.User, &resultForum.Slug, &resultForum.Posts, &resultForum.Threads)
+	if err != nil {
+		return models.Forum{}, models.ErrorNotFound
+	}
+
+	return resultForum, nil
 }

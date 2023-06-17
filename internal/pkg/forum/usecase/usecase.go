@@ -31,3 +31,6 @@ func (u *ForumUsecase) UpdateUser(ctx context.Context, user models.User) (models
 func (u *ForumUsecase) CreateForum(ctx context.Context, forum models.Forum) (models.Forum, error) {
 	return u.repo.CreateForum(ctx, forum)
 }
+func (u *ForumUsecase) GetForum(ctx context.Context, slug string) (models.Forum, error) {
+	return u.repo.GetForum(ctx, slug)
+}

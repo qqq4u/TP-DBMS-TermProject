@@ -11,6 +11,7 @@ type ForumUsecase interface {
 	UpdateUser(ctx context.Context, user models.User) (models.User, error)
 
 	CreateForum(ctx context.Context, forum models.Forum) (models.Forum, error)
+	GetForum(ctx context.Context, slug string) (models.Forum, error)
 }
 
 type ForumRepository interface {
@@ -19,4 +20,5 @@ type ForumRepository interface {
 	UpdateUser(ctx context.Context, user models.User) (models.User, error)
 
 	CreateForum(ctx context.Context, forum models.Forum) (models.Forum, error)
+	GetForum(ctx context.Context, slug string) (models.Forum, error)
 }
