@@ -35,6 +35,13 @@ func main() {
 		{
 			forumSubrouter.HandleFunc("/create", forumHandler.CreateForum).Methods(http.MethodPost)
 			forumSubrouter.HandleFunc("/{slug}/details", forumHandler.GetForumDetails).Methods(http.MethodGet)
+			forumSubrouter.HandleFunc("/{slug}/create", forumHandler.CreateThread).Methods(http.MethodPost)
+			forumSubrouter.HandleFunc("/{slug}/threads", forumHandler.GetThreads).Methods(http.MethodGet)
+		}
+		threadSubrouter := apiSubrouter.PathPrefix("/thread").Subrouter()
+		{
+			threadSubrouter.HandleFunc("/{slug_or_id}/create", forumHandler.CreatePosts).Methods(http.MethodPost)
+			threadSubrouter.HandleFunc("/{slug_or_id}/vote", forumHandler.Vote).Methods(http.MethodPost)
 		}
 	}
 

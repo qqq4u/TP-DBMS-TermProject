@@ -55,14 +55,24 @@ CREATE UNLOGGED TABLE vote
 );
 
 
-CREATE UNLOGGED TABLE user_forum
+CREATE UNLOGGED TABLE forum_users
 (
-    Nickname CITEXT COLLATE "C" NOT NULL,
-    FullName TEXT               NOT NULL,
-    About    TEXT,
-    Email    CITEXT COLLATE "C",
-    Slug     CITEXT COLLATE "C" NOT NULL,
-    FOREIGN KEY (Nickname) REFERENCES "user" (Nickname),
-    FOREIGN KEY (Slug) REFERENCES "forum" (Slug),
-    UNIQUE (Nickname, Slug)
+    Nickname CITEXT COLLATE "C",
+    Forum    CITEXT COLLATE "C",
+    UNIQUE (Nickname, Forum)
 );
+
+
+CREATE OR REPLACE FUNCTION ThreadsCountInc() RETURNS TRIGGER AS
+$update_forums$
+BEGIN
+    UPDATE forum SET Threads=(Threads+1) WHERE slug=NEW.forum;
+    return NEW;
+end
+$update_forums$ LANGUAGE plpgsql;
+
+CREATE TRIGGER a_t_i_forum
+    BEFORE INSERT
+    ON thread
+    FOR EACH ROW
+EXECUTE PROCEDURE ThreadsCountInc();
