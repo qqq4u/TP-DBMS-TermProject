@@ -181,20 +181,17 @@ CREATE TRIGGER on_insert_post
 EXECUTE PROCEDURE updatePath();
 
 CREATE INDEX IF NOT EXISTS users_nickname_index ON "user" USING hash (nickname);
-CREATE INDEX IF NOT EXISTS users_email_index ON "user" USING hash (email);
 
 CREATE INDEX IF NOT EXISTS forum_slug_index ON forum USING hash (slug);
 
 CREATE INDEX IF NOT EXISTS thread_slug_index ON thread USING hash (slug);
-CREATE INDEX IF NOT EXISTS thread_forum_index ON thread USING hash (forum);
 CREATE INDEX IF NOT EXISTS thread_forum_date_index ON thread (forum, created);
 
 CREATE UNIQUE INDEX IF NOT EXISTS forum_users_index ON user_forum (slug, nickname);
 
-CREATE UNIQUE INDEX IF NOT EXISTS vote_index ON vote (Author, Thread);
-CREATE INDEX IF NOT EXISTS post_id_index ON post USING hash (id);
+CREATE UNIQUE INDEX IF NOT EXISTS vote_index ON vote (author, thread);
 
-CREATE INDEX IF NOT EXISTS post_thread_index ON post (thread);
+CREATE INDEX IF NOT EXISTS post_id_index ON post USING hash (id);
 CREATE INDEX IF NOT EXISTS post_thread_path_id_index ON post (thread, path, id);
 CREATE INDEX IF NOT EXISTS post_thread_id_path_parent_index ON post (thread, id, (path[1]), parent);
 CREATE INDEX IF NOT EXISTS post_path_index ON post ((path[1]));
