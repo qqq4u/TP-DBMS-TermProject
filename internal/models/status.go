@@ -1,8 +1,10 @@
 package models
 
+// easyjson -all ./internal/models/status.go
+
 type Status struct {
-	UsersCount   int32 `json:"user"`
-	ForumsCount  int32 `json:"forum"`
-	ThreadsCount int32 `json:"thread"`
-	PostsCount   int32 `json:"post"`
+	UsersCount   int64 `json:"user"`
+	ForumsCount  int64 `json:"forum"`
+	ThreadsCount int64 `json:"thread"`
+	PostsCount   int64 `json:"post"`
 }

@@ -50,6 +50,15 @@ func (u *ForumUsecase) GetThreads(ctx context.Context, slug, limit, since, desc 
 	return u.repo.GetThreads(ctx, slug, limit, since, desc)
 }
 
+func (u *ForumUsecase) GetUsers(ctx context.Context, slug, limit, since, desc string) ([]models.User, error) {
+	_, err := u.repo.GetForum(ctx, slug)
+	if errors.Is(err, models.ErrorNotFound) {
+		return nil, err
+	}
+
+	return u.repo.GetUsers(ctx, slug, limit, since, desc)
+}
+
 func (u *ForumUsecase) CheckThreadByIdOrSlug(ctx context.Context, slugOrId string) (models.Thread, error) {
 	intValue, err := strconv.Atoi(slugOrId)
 	if err != nil {
@@ -60,4 +69,31 @@ func (u *ForumUsecase) CheckThreadByIdOrSlug(ctx context.Context, slugOrId strin
 }
 func (u *ForumUsecase) CreatePosts(ctx context.Context, posts models.PostsList, thread models.Thread) (models.PostsList, error) {
 	return u.repo.CreatePosts(ctx, posts, thread)
+}
+
+func (u *ForumUsecase) Vote(ctx context.Context, vote models.Vote) error {
+	return u.repo.Vote(ctx, vote)
+}
+
+func (u *ForumUsecase) GetPost(ctx context.Context, id string, related []string) (models.PostFull, error) {
+	idInt, _ := strconv.Atoi(id)
+	return u.repo.GetPost(ctx, idInt, related)
+}
+
+func (u *ForumUsecase) GetThreadPosts(ctx context.Context, limit, since, desc, sort string, threadId int) ([]models.Post, error) {
+	return u.repo.GetThreadPosts(ctx, limit, since, desc, sort, threadId)
+}
+func (u *ForumUsecase) UpdateThread(ctx context.Context, thread models.Thread) (models.Thread, error) {
+	return u.repo.UpdateThread(ctx, thread)
+}
+
+func (u *ForumUsecase) UpdatePost(ctx context.Context, post models.PostUpdate) (models.Post, error) {
+	return u.repo.UpdatePost(ctx, post)
+}
+func (u *ForumUsecase) GetStatus() models.Status {
+	return u.repo.GetStatus()
+}
+
+func (u *ForumUsecase) Clear() {
+	u.repo.Clear()
 }

@@ -8,6 +8,8 @@ import (
 	"github.com/qqq4u/TP-DBMS-TermProject/internal/pkg/forum"
 	"github.com/qqq4u/TP-DBMS-TermProject/internal/utils"
 	"net/http"
+	"strconv"
+	"strings"
 )
 
 type Handler struct {
@@ -173,21 +175,18 @@ func (h *Handler) GetThreads(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	query := r.URL.Query()
-	if limits := query["limit"]; len(limits) > 0 {
-		limit = limits[0]
+	if limitTmp := query["limit"]; len(limitTmp) > 0 {
+		limit = limitTmp[0]
 	}
-	if sinces := query["since"]; len(sinces) > 0 {
-		since = sinces[0]
+	if sinceTmp := query["since"]; len(sinceTmp) > 0 {
+		since = sinceTmp[0]
 	}
-	if descs := query["desc"]; len(descs) > 0 {
-		desc = descs[0]
+	if descTmp := query["desc"]; len(descTmp) > 0 {
+		desc = descTmp[0]
 	}
 
 	result, err := h.uc.GetThreads(r.Context(), slug, limit, since, desc)
-	if errors.Is(err, models.ErrorInternal) {
-		utils.Response(w, http.StatusInternalServerError, nil)
-		return
-	} else if errors.Is(err, models.ErrorNotFound) {
+	if errors.Is(err, models.ErrorNotFound) {
 		utils.Response(w, http.StatusNotFound, "Forum not found")
 		return
 	}
@@ -226,13 +225,14 @@ func (h *Handler) CreatePosts(w http.ResponseWriter, r *http.Request) {
 	}
 
 	createdPosts, err := h.uc.CreatePosts(r.Context(), posts, thread)
-	if errors.Is(err, models.ErrorInternal) {
-		utils.Response(w, http.StatusInternalServerError, nil)
+	if errors.Is(err, models.ErrorNotFound) {
+		utils.Response(w, http.StatusNotFound, "Can't find post author")
 		return
 	} else if errors.Is(err, models.ErrorConflict) {
-		utils.Response(w, http.StatusConflict, "Conflict during inserting")
+		utils.Response(w, http.StatusConflict, models.Error{Message: "Wrong post parent"})
 		return
 	}
+
 	utils.Response(w, http.StatusCreated, createdPosts)
 
 }
@@ -265,8 +265,159 @@ func (h *Handler) Vote(w http.ResponseWriter, r *http.Request) {
 		vote.Thread = thread.ID
 	}
 
-	_, _ := h.uc.Vote(r.Context(), vote, thread) //ЗДЕСЬ!
+	if err = h.uc.Vote(r.Context(), vote); errors.Is(err, models.ErrorNotFound) {
+		utils.Response(w, http.StatusNotFound, "User not found")
+		return
+	}
 
 	threadUpdated, _ := h.uc.CheckThreadByIdOrSlug(r.Context(), slugOrId)
 	utils.Response(w, http.StatusOK, threadUpdated)
+}
+
+func (h *Handler) GetThread(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	slugOrId, found := vars["slug_or_id"]
+	if !found {
+		utils.Response(w, http.StatusNotFound, nil)
+		return
+	}
+
+	result, err := h.uc.CheckThreadByIdOrSlug(r.Context(), slugOrId)
+	if errors.Is(err, models.ErrorNotFound) {
+		utils.Response(w, http.StatusNotFound, "Thread not found")
+		return
+	}
+
+	utils.Response(w, http.StatusOK, result)
+}
+
+func (h *Handler) GetPost(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	id, found := vars["id"]
+	if !found {
+		utils.Response(w, http.StatusNotFound, nil)
+		return
+	}
+
+	query := r.URL.Query()
+	var related []string
+	if relatedTmp := query["related"]; len(relatedTmp) > 0 {
+		related = strings.Split(relatedTmp[0], ",")
+	}
+
+	result, err := h.uc.GetPost(r.Context(), id, related)
+	if errors.Is(err, models.ErrorNotFound) {
+		utils.Response(w, http.StatusNotFound, "Post not found")
+		return
+	}
+
+	utils.Response(w, http.StatusOK, result)
+}
+
+func (h *Handler) GetThreadPosts(w http.ResponseWriter, r *http.Request) {
+	var limit, since, desc, sort string
+
+	vars := mux.Vars(r)
+	slugOrId, _ := vars["slug_or_id"]
+
+	query := r.URL.Query()
+	if limitTmp := query["limit"]; len(limitTmp) > 0 {
+		limit = limitTmp[0]
+	}
+	if sinceTmp := query["since"]; len(sinceTmp) > 0 {
+		since = sinceTmp[0]
+	}
+	if descTmp := query["desc"]; len(descTmp) > 0 {
+		desc = descTmp[0]
+	}
+	if sortTmp := query["sort"]; len(sortTmp) > 0 {
+		sort = sortTmp[0]
+	}
+
+	thread, err := h.uc.CheckThreadByIdOrSlug(r.Context(), slugOrId)
+	if errors.Is(err, models.ErrorNotFound) {
+		utils.Response(w, http.StatusNotFound, "Thread not found")
+		return
+	}
+
+	result, _ := h.uc.GetThreadPosts(r.Context(), limit, since, desc, sort, thread.ID)
+
+	utils.Response(w, http.StatusOK, result)
+}
+
+func (h *Handler) UpdateThread(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	slugOrId, _ := vars["slug_or_id"]
+	thread := models.Thread{}
+	easyjson.UnmarshalFromReader(r.Body, &thread)
+
+	idInt, err := strconv.Atoi(slugOrId)
+	if err != nil {
+		thread.Slug = slugOrId
+	} else {
+		thread.ID = idInt
+	}
+
+	result, err := h.uc.UpdateThread(r.Context(), thread)
+
+	if errors.Is(err, models.ErrorNotFound) {
+		utils.Response(w, http.StatusNotFound, "Thread not found")
+		return
+	}
+
+	utils.Response(w, http.StatusOK, result)
+}
+
+func (h *Handler) GetUsers(w http.ResponseWriter, r *http.Request) {
+	var limit, since, desc string
+	vars := mux.Vars(r)
+	slug, _ := vars["slug"]
+
+	query := r.URL.Query()
+	if limits := query["limit"]; len(limits) > 0 {
+		limit = limits[0]
+	}
+	if sinces := query["since"]; len(sinces) > 0 {
+		since = sinces[0]
+	}
+	if descs := query["desc"]; len(descs) > 0 {
+		desc = descs[0]
+	}
+
+	result, err := h.uc.GetUsers(r.Context(), slug, limit, since, desc)
+	if errors.Is(err, models.ErrorInternal) {
+		utils.Response(w, http.StatusInternalServerError, nil)
+		return
+	} else if errors.Is(err, models.ErrorNotFound) {
+		utils.Response(w, http.StatusNotFound, "Forum not found")
+		return
+	}
+
+	utils.Response(w, http.StatusOK, result)
+
+}
+
+func (h *Handler) UpdatePost(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	idStr, _ := vars["id"]
+	id, _ := strconv.Atoi(idStr)
+	postUpdateInfo := models.PostUpdate{ID: id}
+	easyjson.UnmarshalFromReader(r.Body, &postUpdateInfo)
+
+	result, err := h.uc.UpdatePost(r.Context(), postUpdateInfo)
+	if errors.Is(err, models.ErrorNotFound) {
+		utils.Response(w, http.StatusNotFound, "Post not found")
+		return
+	}
+
+	utils.Response(w, http.StatusOK, result)
+}
+
+func (h *Handler) GetStatus(w http.ResponseWriter, r *http.Request) {
+	utils.Response(w, http.StatusOK, h.uc.GetStatus())
+}
+
+func (h *Handler) Clear(w http.ResponseWriter, r *http.Request) {
+	h.uc.Clear()
+	utils.Response(w, http.StatusOK, nil)
 }
