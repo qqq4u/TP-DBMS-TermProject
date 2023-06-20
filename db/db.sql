@@ -1,11 +1,11 @@
- CREATE EXTENSION IF NOT EXISTS CITEXT;
+CREATE EXTENSION IF NOT EXISTS CITEXT;
 
 CREATE UNLOGGED TABLE "user"
 (
     Nickname CITEXT COLLATE "C" PRIMARY KEY,
     FullName TEXT NOT NULL,
     About    TEXT NOT NULL DEFAULT '',
-    Email    CITEXT COLLATE "C"
+    Email    CITEXT COLLATE "C" UNIQUE
 );
 
 CREATE UNLOGGED TABLE forum
@@ -162,57 +162,42 @@ CREATE OR REPLACE FUNCTION updatePath() RETURNS TRIGGER AS
 $update_path$
 DECLARE
     parent_path   INTEGER[];
-    parent_thread int;
 BEGIN
     IF (NEW.parent = 0) THEN
-        NEW.path := array_append(new.path, new.id);
+        NEW.path := array_append(NEW.path, NEW.id);
     ELSE
-        SELECT thread FROM post WHERE id = new.parent INTO parent_thread;
-        IF NOT FOUND OR parent_thread != NEW.thread THEN
-            RAISE EXCEPTION 'NOT FOUND OR parent_thread != NEW.thread' USING ERRCODE = '22409';
-        end if;
-
-        SELECT path FROM post WHERE id = new.parent INTO parent_path;
-        NEW.path := parent_path || new.id;
+        SELECT path FROM "post" WHERE id = NEW.parent INTO parent_path;
+        NEW.path := parent_path || NEW.id;
     END IF;
-    UPDATE forum SET Posts=Posts + 1 WHERE forum.slug = new.forum;
-    RETURN new;
+    UPDATE forum SET Posts=(Posts+1) WHERE Slug = NEW.Forum;
+    return NEW;
 END
 $update_path$ LANGUAGE plpgsql;
 
-CREATE TRIGGER u_p_trigger
+CREATE TRIGGER on_insert_post
     BEFORE INSERT
-    ON post
+    ON "post"
     FOR EACH ROW
 EXECUTE PROCEDURE updatePath();
 
-CREATE INDEX IF NOT EXISTS thread_slug_idx ON "thread" (slug);
-CREATE INDEX IF NOT EXISTS thread_id_idx ON "thread" (id);
+CREATE INDEX IF NOT EXISTS users_nickname_index ON "user" USING hash (nickname);
+CREATE INDEX IF NOT EXISTS users_email_index ON "user" USING hash (email);
 
-CREATE INDEX IF NOT EXISTS post_thread_idx ON "post" (thread);
-CREATE INDEX IF NOT EXISTS post_thread_id_idx ON "post" (thread, id);
-CREATE INDEX IF NOT EXISTS post_id_path1_idx ON "post" (id, (path[1]));
-CREATE INDEX IF NOT EXISTS post_path1_idx ON "post" ((path[1]));
-CREATE INDEX IF NOT EXISTS post_thread_path_idx ON "post" (thread, path, id);
-CREATE INDEX IF NOT EXISTS post_thread_path1_parent_idx ON "post" (thread, id, (path[1]), parent);
+CREATE INDEX IF NOT EXISTS forum_slug_index ON forum USING hash (slug);
 
-CREATE INDEX IF NOT EXISTS user_nickname_hash_idx ON "user" USING hash (nickname);
-CREATE INDEX IF NOT EXISTS user_email_hash_idx ON "user" USING hash (email);
-CREATE INDEX IF NOT EXISTS user_full_idx ON "user" (email, nickname);
+CREATE INDEX IF NOT EXISTS thread_slug_index ON thread USING hash (slug);
+CREATE INDEX IF NOT EXISTS thread_forum_index ON thread USING hash (forum);
+CREATE INDEX IF NOT EXISTS thread_forum_date_index ON thread (forum, created);
 
-CREATE INDEX IF NOT EXISTS forum_slug_hash_idx ON "forum" USING hash (slug);
+CREATE UNIQUE INDEX IF NOT EXISTS forum_users_index ON user_forum (slug, nickname);
 
-CREATE INDEX IF NOT EXISTS thread_date_idx ON thread (created);
-CREATE INDEX IF NOT EXISTS thread_forum_date_idx ON thread (forum, created);
-CREATE INDEX IF NOT EXISTS thread_forum_hash_idx ON thread USING hash (forum);
-CREATE INDEX IF NOT EXISTS thr_slug_hash_idx ON thread USING hash (slug);
+CREATE UNIQUE INDEX IF NOT EXISTS vote_index ON vote (Author, Thread);
+CREATE INDEX IF NOT EXISTS post_id_index ON post USING hash (id);
 
-CREATE INDEX IF NOT EXISTS vote_full_idx ON vote (author, voice, thread);
-
-CREATE INDEX IF NOT EXISTS fu_forum ON user_forum USING hash(Slug);
-
-CREATE UNIQUE INDEX IF NOT EXISTS forum_users_unique ON user_forum (slug, nickname);
-CREATE UNIQUE INDEX IF NOT EXISTS vote_unique ON vote (author, thread);
+CREATE INDEX IF NOT EXISTS post_thread_index ON post (thread);
+CREATE INDEX IF NOT EXISTS post_thread_path_id_index ON post (thread, path, id);
+CREATE INDEX IF NOT EXISTS post_thread_id_path_parent_index ON post (thread, id, (path[1]), parent);
+CREATE INDEX IF NOT EXISTS post_path_index ON post ((path[1]));
 
 VACUUM;
 VACUUM ANALYSE;
